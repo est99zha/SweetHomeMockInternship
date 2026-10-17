@@ -2008,6 +2008,25 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
    * that makes it fill <code>pageFormat</code> imageable size if this attribute is <code>null</code>.
    */
   public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
+    List<Level> viewableLevels = new ArrayList<Level>();
+
+    for (Level level : this.home.getLevels()) {
+      if (level.isViewable()) {
+        viewableLevels.add(level);
+      }
+    }
+    Level originalSelectedLevel = this.home.getSelectedLevel();
+    try{
+      if (!viewableLevels.isEmpty()
+              && (this.home.getPrint() == null
+              || this.home.getPrint().getPlanScale() == null)) {
+
+        if (pageIndex < 0 || pageIndex >= viewableLevels.size()) {
+          return NO_SUCH_PAGE;
+        }
+
+        this.home.setSelectedLevel(viewableLevels.get(pageIndex));
+      }
     List<Selectable> printedItems = getPaintedItems(); 
     Rectangle2D printedItemBounds = getItemsBounds(g, printedItems);
     if (printedItemBounds != null) {
@@ -2023,21 +2042,21 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
       if (this.home.getPrint() == null || this.home.getPrint().getPlanScale() == null) {
         // Compute a scale that ensures the plan will fill the component if plan scale is null
         printScale = getPrintPreferredScale(g, pageFormat) * LengthUnit.centimeterToInch(72);
-        if (pageIndex > 0) {
+        if (viewableLevels.isEmpty() && pageIndex > 0) {
           return NO_SUCH_PAGE;
         }
         pagesPerRow = 1;
         pagesPerColumn = 1;
-        rowIndex   = 0;
+        rowIndex = 0;
         columnIndex = 0;
       } else {
         // Apply print scale to paper size expressed in 1/72nds of an inch
         printScale = this.home.getPrint().getPlanScale().floatValue() * LengthUnit.centimeterToInch(72);
-        pagesPerRow = (int)(printedItemBounds.getWidth() * printScale / imageableWidth);
+        pagesPerRow = (int) (printedItemBounds.getWidth() * printScale / imageableWidth);
         if (printedItemBounds.getWidth() * printScale != imageableWidth) {
           pagesPerRow++;
         }
-        pagesPerColumn = (int)(printedItemBounds.getHeight() * printScale / imageableHeight);
+        pagesPerColumn = (int) (printedItemBounds.getHeight() * printScale / imageableHeight);
         if (printedItemBounds.getHeight() * printScale != imageableHeight) {
           pagesPerColumn++;
         }
@@ -2047,6 +2066,7 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
         rowIndex = pageIndex / pagesPerRow;
         columnIndex = pageIndex - rowIndex * pagesPerRow;
       }
+
           
       Graphics2D g2D = (Graphics2D)g.create();
       g2D.clip(new Rectangle2D.Double(imageableX, imageableY, imageableWidth, imageableHeight));
@@ -2062,6 +2082,7 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
           Math.max(0, 
               (imageableHeight * pagesPerColumn / printScale - printedItemBounds.getHeight() - 2 * extraMargin) / 2));
       setRenderingHints(g2D);
+
       try {
         // Print component contents
         paintContent(g2D, printScale, PaintMode.PRINT);
@@ -2072,6 +2093,9 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
       return PAGE_EXISTS;
     } else {
       return NO_SUCH_PAGE;
+    }
+    } finally {
+      this.home.setSelectedLevel(originalSelectedLevel);
     }
   }
   
